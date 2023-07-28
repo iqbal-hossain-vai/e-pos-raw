@@ -1,0 +1,58 @@
+version: '3'
+services:
+  geth:
+    image: ethereum/client-go:v1.10.11
+    command: >
+      --http --http.api=eth --http.addr=0.0.0.0 --authrpc.vhosts=* --datadir=/gethdata --allow-insecure-unlock --unlock="0x123463a4b065722e99115d6c222f267d9cabb524" console --syncmode=full --authrpc.jwtsecret=/app/jwt.hex --http.corsdomain=* --http.vhosts=* --password=/app/password.txt --nodiscover
+    volumes:
+      - ./gethdata:/gethdata
+      - ./jwt.hex:/app/jwt.hex
+      - ./password.txt:/app/password.txt
+    ports:
+      - "8545:8545"
+
+  beacon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      /app/beacon-chain
+      --datadir=/beacondata
+      --min-sync-peers=0
+      --genesis-state=/app/genesis.ssz
+      --chain-config-file=/app/config.yml
+      --config-file=/app/config.yml
+      --chain-id=32382
+      --execution-endpoint=http://0.0.0.0:8551
+      --accept-terms-of-use
+      --jwt-secret=/app/jwt.hex
+      --rpc-host=0.0.0.0
+      --contract-deployment-block=0
+      --grpc-gateway-host=0.0.0.0
+      --suggested-fee-recipient=0x123463a4b065722e99115d6c222f267d9cabb524
+      --p2p-static-id
+    volumes:
+      - ./beacondata:/beacondata
+      - ./jwt.hex:/app/jwt.hex
+      - ./genesis.ssz:/app/genesis.ssz
+      - ./config.yml:/app/config.yml
+    ports:
+      - "8551:8551"
+
+  validator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      /app/validator
+      --beacon-rpc-provider=beacon:4000
+      --datadir=/validatordata
+      --accept-terms-of-use
+      --interop-num-validators=64
+      --interop-start-index=0
+      --chain-config-file=/app/config.yml
+    volumes:
+      - ./validatordata:/validatordata
+      - ./config.yml:/app/config.yml
+    depends_on:
+      - beacon
